@@ -4,8 +4,6 @@
 .flaskenv
 
 # ── ERA5 data files (large — don't commit to git) ───────────────
-data/*.nc
-uploads/*.nc
 *.csv
 reference/
 
