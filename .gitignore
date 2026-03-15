@@ -1,0 +1,36 @@
+# ── Environment / secrets ───────────────────────────────────────
+.env
+*.env
+.flaskenv
+
+# ── ERA5 data files (large — don't commit to git) ───────────────
+data/*.nc
+uploads/*.nc
+*.csv
+reference/
+
+# ── Cache ────────────────────────────────────────────────────────
+.climate_cache*
+__pycache__/
+*.pyc
+*.pyo
+.cache/
+.ipynb_checkpoints/
+
+# ── Python ───────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# ── OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo

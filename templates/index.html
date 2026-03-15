@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PyClimaExplorer — Climate Data Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Exo+2:wght@300;400;500;600&display=swap"
+    rel="stylesheet">
+  <style>
+    /* ─── Reset & Base ────────────────────────────────────────────────── */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #00050f;
+      --cyan: #4ad4e8;
+      --cyan2: #00a8c0;
+      --purple: #a78bfa;
+      --card: rgba(0, 15, 38, 0.88);
+      --border: rgba(74, 212, 232, 0.25);
+      --border-bright: rgba(74, 212, 232, 0.6);
+      --text: #e8f4f8;
+      --muted: #6a9aa8;
+      --font-h: 'Orbitron', monospace;
+      --font-b: 'Exo 2', sans-serif;
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text)
+    }
+
+    /* ─── Stars canvas ───────────────────────────────────────────────── */
+    #stars-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ─── Globe wrapper ──────────────────────────────────────────────── */
+    #globe-wrap {
+      position: fixed;
+      left: 50%;
+      bottom: -28vh;
+      transform: translateX(-50%);
+      width: 72vh;
+      height: 72vh;
+      z-index: 5;
+      transition: all 1.3s var(--ease);
+    }
+
+    #globe-wrap.input-mode {
+      left: 2vw;
+      bottom: auto;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 50vw;
+      height: 90vh;
+    }
+
+    #globe-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    #globe-canvas:active {
+      cursor: grabbing
+    }
+
+    /* ─── Tooltip ────────────────────────────────────────────────────── */
+    #tip {
+      position: fixed;
+      z-index: 50;
+      background: rgba(0, 15, 40, 0.95);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: var(--font-b);
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .15s;
+      backdrop-filter: blur(8px);
+      max-width: 200px;
+    }
+
+    #tip.show {
+      opacity: 1
+    }
+
+    #tip .tip-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text)
+    }
+
+    #tip .tip-coord {
+      color: var(--cyan);
+      margin-top: 3px;
+      font-size: 11px
+    }
+
+    #tip .tip-hint {
+      color: var(--muted);
+      margin-top: 5px;
+      font-size: 10px
+    }
+
+    /* ─── Landing page ───────────────────────────────────────────────── */
+    #page-landing {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding-top: min(8vh, 70px);
+      pointer-events: none;
+      transition: opacity .8s var(--ease), transform .8s var(--ease);
+    }
+
+    #page-landing.hide {
+      opacity: 0;
+      transform: translateY(-40px);
+      pointer-events: none
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-h);
+      font-size: clamp(20px, 6vw, 129px);
+      font-weight: 700;
+      letter-spacing: .06em;
+      color: #bdeaff;
+      text-shadow: 0 0 30px rgba(74, 212, 232, 0.5);
+      pointer-events: auto;
+    }
+
+    .logo-icon {
+      width: 64px;
+      height: 64px;
+      flex-shrink: 0;
+    }
+
+    .landing-tagline {
+      margin-top: clamp(24px, 4vh, 48px);
+      text-align: center;
+      font-family: var(--font-h);
+      font-size: clamp(22px, 3.5vw, 42px);
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: .03em;
+      color: var(--cyan);
+      text-shadow: 0 0 60px rgba(74, 212, 232, 0.35);
+      pointer-events: auto;
+    }
+
+    .landing-sub {
+      margin-top: 16px;
+      text-align: center;
+      font-family: var(--font-b);
+      font-size: clamp(13px, 1.6vw, 16px);
+      color: #bdeaff;
+      max-width: 520px;
+      line-height: 1.7;
+      pointer-events: auto;
+    }
+
+    #btn-explore {
+      margin-top: clamp(28px, 4vh, 48px);
+      pointer-events: auto;
+      font-family: var(--font-h);
+      font-size: 14px;
+      letter-spacing: .1em;
+      font-weight: 600;
+      color: var(--cyan);
+      background: rgba(74, 212, 232, 0.06);
+      border: 1.5px solid var(--cyan);
+      padding: 14px 52px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-transform: uppercase;
+      position: relative;
+      overflow: hidden;
+      transition: background .3s, box-shadow .3s, transform .2s;
+      box-shadow: 0 0 18px rgba(74, 212, 232, 0.2), inset 0 0 18px rgba(74, 212, 232, 0.03);
+    }
+
+    #btn-explore:hover {
+      background: rgba(74, 212, 232, 0.12);
+      box-shadow: 0 0 32px rgba(74, 212, 232, 0.45), 0 0 8px rgba(74, 212, 232, 0.25), inset 0 0 24px rgba(74, 212, 232, 0.08);
+      transform: translateY(-1px);
+    }
+
+    #btn-explore::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(74, 212, 232, 0.12) 50%, transparent 100%);
+      transform: translateX(-100%);
+      transition: transform .6s;
+    }
+
+    #btn-explore:hover::after {
+      transform: translateX(100%)
+    }
+
+    /* ─── Input panel ────────────────────────────────────────────────── */
+    #page-input {
+      position: fixed;
+      right: 0;
+      top: 0;
+      width: 42vw;
+      height: 100vh;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: translateX(110%);
+      transition: transform 1.3s var(--ease);
+      padding: 0 3vw;
+    }
+
+    #page-input.show {
+      transform: translateX(0)
+    }
+
+    .glass-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 28px 32px;
+      width: 100%;
+      backdrop-filter: blur(18px);
+      box-shadow: 0 0 60px rgba(74, 212, 232, 0.07), inset 0 1px 0 rgba(74, 212, 232, 0.12);
+      max-height: 90vh;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .panel-section {
+      margin-top: 20px
+    }
+
+    .panel-section:first-child {
+      margin-top: 0
+    }
+
+    .panel-label {
+      font-family: var(--font-h);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--cyan2);
+      margin-bottom: 8px;
+    }
+
+    /* Location display */
+    #loc-display {
+      background: rgba(74, 212, 232, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: var(--font-b);
+      font-size: 14px;
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #loc-display.selected {
+      border-color: var(--cyan);
+      background: rgba(74, 212, 232, 0.08)
+    }
+
+    #loc-display .loc-hint {
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    #loc-coord {
+      font-size: 11px;
+      color: var(--cyan);
+      margin-top: 4px
+    }
+
+    /* Year slider */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 6px
+    }
+
+    .slider-row input[type=range] {
+      flex: 1;
+      height: 4px;
+      appearance: none;
+      background: linear-gradient(to right, var(--cyan) 0%, var(--cyan) var(--pct, 100%), rgba(74, 212, 232, 0.2) var(--pct, 100%));
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider-row input[type=range]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(74, 212, 232, 0.6);
+      cursor: pointer;
+    }
+
+    .slider-val {
+      font-family: var(--font-h);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--cyan);
+      min-width: 40px;
+      text-align: right;
+    }
+
+    .slider-bounds {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 3px
+    }
+
+    /* Month pills */
+    .month-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .month-pill {
+      font-family: var(--font-h);
+      font-size: 9px;
+      letter-spacing: .06em;
+      color: var(--muted);
+      background: rgba(74, 212, 232, 0.05);
+      border: 1px solid rgba(74, 212, 232, 0.15);
+      border-radius: 3px;
+      padding: 6px 10px;
+      cursor: pointer;
+      transition: all .2s;
+      text-transform: uppercase;
+    }
+
+    .month-pill:hover {
+      color: var(--cyan);
+      border-color: var(--border-bright)
+    }
+
+    .month-pill.active {
+      color: var(--bg);
+      background: var(--cyan);
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(74, 212, 232, 0.4);
+    }
+
+    /* Variable dropdown */
+    #var-select {
+      width: 100%;
+      margin-top: 6px;
+      background: rgba(74, 212, 232, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: var(--font-b);
+      font-size: 14px;
+      color: var(--text);
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234ad4e8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: calc(100% - 14px) 50%;
+      transition: border-color .2s;
+    }
+
+    #var-select:focus {
+      border-color: var(--cyan)
+    }
+
+    #var-select option {
+      background: #001525
+    }
+
+    /* Submit button */
+    #btn-submit {
+      width: 100%;
+      margin-top: 24px;
+      font-family: var(--font-h);
+      font-size: 13px;
+      letter-spacing: .12em;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--bg);
+      background: linear-gradient(135deg, var(--cyan), var(--cyan2));
+      border: none;
+      border-radius: 6px;
+      padding: 16px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: opacity .2s, transform .2s, box-shadow .2s;
+      box-shadow: 0 0 30px rgba(74, 212, 232, 0.3);
+    }
+
+    #btn-submit:hover {
+      opacity: .92;
+      transform: translateY(-1px);
+      box-shadow: 0 0 50px rgba(74, 212, 232, 0.5);
+    }
+
+    #btn-submit:active {
+      transform: translateY(0)
+    }
+
+    #btn-submit.loading {
+      opacity: .6;
+      pointer-events: none
+    }
+
+    /* Loading overlay */
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .4s;
+    }
+
+    #loading-overlay.show {
+      opacity: 1;
+      pointer-events: auto
+    }
+
+    .loader-ring {
+      width: 64px;
+      height: 64px;
+      border: 2px solid rgba(74, 212, 232, 0.15);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .loader-text {
+      margin-top: 20px;
+      font-family: var(--font-h);
+      font-size: 12px;
+      letter-spacing: .12em;
+      color: var(--cyan);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: .5
+      }
+
+      50% {
+        opacity: 1
+      }
+    }
+
+    /* Nebula overlay */
+    .nebula {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 40% at 20% 80%, rgba(74, 212, 232, 0.04) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 35% at 80% 20%, rgba(167, 139, 250, 0.05) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 60% 60%, rgba(0, 80, 120, 0.06) 0%, transparent 70%);
+    }
+
+    /* Input page header */
+    .input-logo {
+      display: none;
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-h);
+      font-size: 14px;
+      color: var(--cyan2);
+      letter-spacing: .08em;
+      z-index: 25;
+      opacity: 0;
+      transition: opacity .8s .5s var(--ease);
+      white-space: nowrap;
+    }
+
+    .input-logo.show {
+      display: block;
+      opacity: 1
+    }
+
+    /* File upload button */
+    .nc-upload {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-family: var(--font-b);
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      border: 1px dashed rgba(74, 212, 232, 0.2);
+      border-radius: 6px;
+      padding: 8px 14px;
+      transition: border-color .2s, color .2s;
+    }
+
+    .nc-upload:hover {
+      border-color: var(--border-bright);
+      color: var(--cyan)
+    }
+
+    .nc-upload input {
+      display: none
+    }
+
+    #nc-status {
+      font-family: var(--font-b);
+      font-size: 11px;
+      color: var(--cyan);
+      margin-top: 4px;
+      min-height: 16px
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Stars -->
+  <canvas id="stars-canvas"></canvas>
+  <div class="nebula"></div>
+
+  <!-- Globe -->
+  <div id="globe-wrap">
+    <canvas id="globe-canvas"></canvas>
+  </div>
+
+  <!-- Hover tooltip -->
+  <div id="tip">
+    <div class="tip-name" id="tip-name">—</div>
+    <div class="tip-coord" id="tip-coord"></div>
+    <div class="tip-hint" id="tip-hint">Click to select location</div>
+  </div>
+
+  <!-- ─── Landing page ─────────────────────────────────────────── -->
+  <div id="page-landing">
+    <div class="logo">
+      <!-- Custom minimal logo SVG -->
+      <svg class="logo-icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="22" cy="22" r="8" fill="none" stroke="#4ad4e8" stroke-width="1.5" />
+        <circle cx="22" cy="22" r="2.5" fill="#4ad4e8" />
+        <ellipse cx="22" cy="22" rx="20" ry="8" fill="none" stroke="#4ad4e8" stroke-width="1" stroke-dasharray="3 2"
+          opacity=".6" />
+        <ellipse cx="22" cy="22" rx="8" ry="20" fill="none" stroke="#4ad4e8" stroke-width="1" stroke-dasharray="3 2"
+          opacity=".6" transform="rotate(60 22 22)" />
+        <ellipse cx="22" cy="22" rx="8" ry="20" fill="none" stroke="#4ad4e8" stroke-width="1" stroke-dasharray="3 2"
+          opacity=".6" transform="rotate(120 22 22)" />
+        <circle cx="22" cy="2" r="2" fill="#4ad4e8" opacity=".5" />
+        <circle cx="38.6" cy="12" r="2" fill="#4ad4e8" opacity=".5" />
+        <circle cx="38.6" cy="32" r="2" fill="#4ad4e8" opacity=".5" />
+        <circle cx="22" cy="42" r="2" fill="#4ad4e8" opacity=".5" />
+        <circle cx="5.4" cy="32" r="2" fill="#4ad4e8" opacity=".5" />
+        <circle cx="5.4" cy="12" r="2" fill="#4ad4e8" opacity=".5" />
+      </svg>
+      PyClimaExplorer
+    </div>
+
+    <div class="landing-tagline">
+      Explore Climate Data<br>Across Time and Space
+    </div>
+
+    <div class="landing-sub">
+      Visualize global climate patterns, study historical trends,<br>
+      and uncover the story of our changing planet.
+    </div>
+
+    <button id="btn-explore">Explore</button>
+  </div>
+
+  <!-- ─── Input panel ──────────────────────────────────────────── -->
+  <div id="page-input">
+    <div class="glass-panel">
+
+      <div class="logo" style="font-size:14px;margin-bottom:4px">
+        <svg class="logo-icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg"
+          style="width:32px;height:32px">
+          <circle cx="22" cy="22" r="8" fill="none" stroke="#4ad4e8" stroke-width="1.5" />
+          <circle cx="22" cy="22" r="2.5" fill="#4ad4e8" />
+          <ellipse cx="22" cy="22" rx="20" ry="8" fill="none" stroke="#4ad4e8" stroke-width="1" stroke-dasharray="3 2"
+            opacity=".6" />
+          <ellipse cx="22" cy="22" rx="8" ry="20" fill="none" stroke="#4ad4e8" stroke-width="1" stroke-dasharray="3 2"
+            opacity=".6" transform="rotate(60 22 22)" />
+          <ellipse cx="22" cy="22" rx="8" ry="20" fill="none" stroke="#4ad4e8" stroke-width="1" stroke-dasharray="3 2"
+            opacity=".6" transform="rotate(120 22 22)" />
+        </svg>
+        PyClimaExplorer
+      </div>
+
+      <!-- Location -->
+      <div class="panel-section">
+        <div class="panel-label">Select Location</div>
+        <div id="loc-display">
+          <span class="loc-hint">Click on the globe ↖</span>
+          <span>▾</span>
+        </div>
+        <div id="loc-coord"></div>
+      </div>
+
+      <!-- Year -->
+      <div class="panel-section">
+        <div class="panel-label">Select Year</div>
+        <div class="slider-row">
+          <span style="font-size:10px;color:var(--muted)">1950</span>
+          <input type="range" id="year-slider" min="1950" max="2023" value="2023" style="--pct:100%">
+          <span class="slider-val" id="year-val">2023</span>
+        </div>
+        <div class="slider-bounds"><span></span><span style="font-size:10px;color:var(--muted)">2023</span></div>
+      </div>
+
+      <!-- Month -->
+      <div class="panel-section">
+        <div class="panel-label">Select Month <span style="color:var(--muted);font-size:9px">(optional — blank = full
+            year)</span></div>
+        <div class="month-pills" id="month-pills">
+          <div class="month-pill" data-m="0">All</div>
+          <div class="month-pill" data-m="1">Jan</div>
+          <div class="month-pill" data-m="2">Feb</div>
+          <div class="month-pill" data-m="3">Mar</div>
+          <div class="month-pill" data-m="4">Apr</div>
+          <div class="month-pill" data-m="5">May</div>
+          <div class="month-pill" data-m="6">Jun</div>
+          <div class="month-pill" data-m="7">Jul</div>
+          <div class="month-pill" data-m="8">Aug</div>
+          <div class="month-pill" data-m="9">Sep</div>
+          <div class="month-pill" data-m="10">Oct</div>
+          <div class="month-pill" data-m="11">Nov</div>
+          <div class="month-pill" data-m="12">Dec</div>
+        </div>
+      </div>
+
+      <!-- Variable -->
+      <div class="panel-section">
+        <div class="panel-label">Select Variable</div>
+        <select id="var-select">
+          <option value="temperature">🌡 Temperature</option>
+          <option value="precipitation">🌧 Precipitation</option>
+          <option value="wind_speed">💨 Wind Speed</option>
+          <option value="snowfall">❄ Snowfall</option>
+          <option value="solar_radiation">☀ Solar Radiation</option>
+        </select>
+      </div>
+
+      <!-- NetCDF upload (optional) -->
+      <div class="panel-section">
+        <div class="panel-label">Upload NetCDF File <span style="color:var(--muted);font-size:9px">(optional)</span>
+        </div>
+        <label class="nc-upload">
+          <input type="file" id="nc-file" accept=".nc">
+          <span>📂 Choose .nc file (ERA5 / CESM)</span>
+        </label>
+        <div id="nc-status"></div>
+      </div>
+
+      <!-- Submit -->
+      <button id="btn-submit">Submit</button>
+
+    </div>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay">
+    <div class="loader-ring"></div>
+    <div class="loader-text">Fetching Climate Data…</div>
+  </div>
+
+  <!-- Three.js + OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    /* ─────────────────────────────────────────────────────────────────
+       STARFIELD
+    ───────────────────────────────────────────────────────────────── */
+    (function () {
+      const c = document.getElementById('stars-canvas');
+      const ctx = c.getContext('2d');
+      let stars = [];
+      function resize() {
+        c.width = innerWidth; c.height = innerHeight;
+        stars = Array.from({ length: 300 }, () => ({
+          x: Math.random() * c.width, y: Math.random() * c.height,
+          r: Math.random() * 1.4 + 0.2,
+          a: Math.random(), da: (Math.random() - .5) * 0.003,
+        }));
+      }
+      function draw() {
+        ctx.clearRect(0, 0, c.width, c.height);
+        stars.forEach(s => {
+          s.a = Math.max(0, Math.min(1, s.a + s.da));
+          if (s.a <= 0 || s.a >= 1) s.da *= -1;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(200,235,255,${s.a})`;
+          ctx.fill();
+        });
+        requestAnimationFrame(draw);
+      }
+      resize(); draw();
+      window.addEventListener('resize', resize);
+    })();
+
+    /* ─────────────────────────────────────────────────────────────────
+       THREE.JS GLOBE
+    ───────────────────────────────────────────────────────────────── */
+    const globeWrap = document.getElementById('globe-wrap');
+    const globeCanvas = document.getElementById('globe-canvas');
+
+    const W0 = globeWrap.clientWidth || 500;
+    const H0 = globeWrap.clientHeight || 500;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(42, W0 / H0, 0.1, 100);
+    camera.position.set(0, 0, 3.2);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: globeCanvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(W0, H0);
+
+    /* ── Procedural Earth Texture ──────────────────────────────── */
+    function buildEarthTexture() {
+      const W = 1024, H = 512;
+      const cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      const x = cv.getContext('2d');
+      const img = x.createImageData(W, H);
+      const d = img.data;
+
+      // Continents: simplified lat/lon polygons (equirectangular)
+      // We'll build an offline-safe procedural texture
+      for (let j = 0; j < H; j++) {
+        for (let i = 0; i < W; i++) {
+          const lon = (i / W) * 360 - 180;
+          const lat = 90 - (j / H) * 180;
+
+          // noise-ish function for continents
+          const fx = lon / 60, fy = lat / 40;
+          let n = 0;
+          for (let o = 1; o <= 5; o++) {
+            const f = Math.pow(2, o);
+            n += Math.sin(fx * f + Math.cos(fy * f * 0.7 + 1.1)) * Math.cos(fy * f * 0.9 + Math.sin(fx * f * 0.5)) / (f);
+          }
+          n = (n + 0.6) / 1.2;
+
+          // Realistic continent-like distribution
+          let land = false;
+          // North America
+          if (lon > -140 && lon < -50 && lat > 15 && lat < 75 && n > 0.42) land = true;
+          // South America
+          if (lon > -82 && lon < -33 && lat > -58 && lat < 13 && n > 0.38) land = true;
+          // Europe + Asia
+          if (lon > -10 && lon < 180 && lat > -12 && lat < 75 && n > 0.40) land = true;
+          // Africa
+          if (lon > -20 && lon < 52 && lat > -36 && lat < 38 && n > 0.35) land = true;
+          // Australia
+          if (lon > 112 && lon < 155 && lat > -40 && lat < -10 && n > 0.36) land = true;
+          // Greenland
+          if (lon > -55 && lon < -15 && lat > 60 && lat < 85 && n > 0.36) land = true;
+
+          let r, g, b;
+          const latAbs = Math.abs(lat);
+
+          if (land) {
+            // Elevation tint
+            const elev = (n - 0.38) * 2.5;
+            r = Math.floor(18 + 28 * elev);
+            g = Math.floor(55 + 40 * (1 - elev * 0.5));
+            b = Math.floor(18 + 20 * elev);
+          } else {
+            // Ocean depth
+            const depth = latAbs / 90;
+            r = Math.floor(3 + 8 * (1 - depth));
+            g = Math.floor(18 + 45 * (1 - depth));
+            b = Math.floor(45 + 90 * (1 - depth));
+          }
+
+          // Polar ice
+          if (latAbs > 72) {
+            const ice = Math.min(1, (latAbs - 72) / 18);
+            r = Math.round(r * (1 - ice) + 215 * ice);
+            g = Math.round(g * (1 - ice) + 228 * ice);
+            b = Math.round(b * (1 - ice) + 245 * ice);
+          }
+
+          // City glow clusters (warm dots)
+          const cityPts = [
+            [0, 51], [2, 49], [-74, 41], [-87, 42], [139, 36], [77, 29],
+            [121, 31], [116, 39], [37, 56], [28, 41], [151, -34], [18, -34]
+          ];
+          cityPts.forEach(([cLon, cLat]) => {
+            const dx = lon - cLon, dy = lat - cLat;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 4) {
+              const glow = Math.max(0, 1 - dist / 4) * 0.5;
+              r = Math.min(255, Math.round(r + glow * 100));
+              g = Math.min(255, Math.round(g + glow * 70));
+              b = Math.min(255, Math.round(b + glow * 20));
+            }
+          });
+
+          const idx = (j * W + i) * 4;
+          d[idx] = r; d[idx + 1] = g; d[idx + 2] = b; d[idx + 3] = 255;
+        }
+      }
+      x.putImageData(img, 0, 0);
+      const tex = new THREE.CanvasTexture(cv);
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    /* ── Earth sphere ──────────────────────────────────────────── */
+    const earthGeo = new THREE.SphereGeometry(1, 64, 64);
+    const earthMat = new THREE.MeshPhongMaterial({
+      map: buildEarthTexture(),
+      specular: new THREE.Color(0x224455),
+      shininess: 20,
+      bumpScale: 0.02,
+    });
+    const earth = new THREE.Mesh(earthGeo, earthMat);
+    scene.add(earth);
+
+    /* Try loading a high-res texture (CDN - graceful fallback) */
+    const loader = new THREE.TextureLoader();
+    loader.crossOrigin = 'anonymous';
+    loader.load(
+      'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+      tex => { earthMat.map = tex; earthMat.needsUpdate = true; },
+      undefined, () => { } // fallback already set
+    );
+
+    /* ── Atmosphere glow ───────────────────────────────────────── */
+    const atmGeo = new THREE.SphereGeometry(1.07, 64, 64);
+    const atmMat = new THREE.ShaderMaterial({
+      vertexShader: `
+    varying vec3 vN;
+    void main(){
+      vN=normalize(normalMatrix*normal);
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);
+    }`,
+      fragmentShader: `
+    varying vec3 vN;
+    void main(){
+      float i=pow(max(0.,0.65-dot(vN,vec3(0.,0.,1.))),2.8);
+      gl_FragColor=vec4(0.25,0.72,1.0,1.)*i*1.4;
+    }`,
+      side: THREE.FrontSide,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+    });
+    scene.add(new THREE.Mesh(atmGeo, atmMat));
+
+    /* ── Outer haze ring ───────────────────────────────────────── */
+    const hazeGeo = new THREE.SphereGeometry(1.13, 64, 64);
+    const hazeMat = new THREE.ShaderMaterial({
+      vertexShader: `
+    varying vec3 vN;
+    void main(){ vN=normalize(normalMatrix*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+      fragmentShader: `
+    varying vec3 vN;
+    void main(){
+      float i=pow(max(0.,0.72-dot(vN,vec3(0.,0.,1.))),4.5);
+      gl_FragColor=vec4(0.1,0.5,1.,1.)*i*0.5;
+    }`,
+      side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+    });
+    scene.add(new THREE.Mesh(hazeGeo, hazeMat));
+
+    /* ── Orbit ring ────────────────────────────────────────────── */
+    const orbitGeo = new THREE.TorusGeometry(1.55, 0.003, 3, 256);
+    const orbitMat = new THREE.MeshBasicMaterial({
+      color: 0x00aadd, transparent: true, opacity: 0.25
+    });
+    const orbitRing = new THREE.Mesh(orbitGeo, orbitMat);
+    orbitRing.rotation.x = Math.PI / 5;
+    scene.add(orbitRing);
+
+    /* ── Starfield inside 3D scene ─────────────────────────────── */
+    const starVerts = [];
+    for (let i = 0; i < 3000; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const r = 40 + Math.random() * 30;
+      starVerts.push(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
+    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xaaddff, size: 0.15, sizeAttenuation: true })));
+
+    /* ── Lights ────────────────────────────────────────────────── */
+    scene.add(new THREE.AmbientLight(0x334466, 0.9));
+    const sun = new THREE.DirectionalLight(0xaaddff, 1.3);
+    sun.position.set(5, 3, 5);
+    scene.add(sun);
+
+    /* ── OrbitControls ─────────────────────────────────────────── */
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.enableZoom = true;
+    controls.minDistance = 1.6;
+    controls.maxDistance = 6;
+    controls.enabled = false; // enabled after transition
+    controls.enablePan = false;
+
+    /* ── Location pin ──────────────────────────────────────────── */
+    const pinGeo = new THREE.SphereGeometry(0.025, 16, 16);
+    const pinMat = new THREE.MeshBasicMaterial({ color: 0xff3355 });
+    const pin = new THREE.Mesh(pinGeo, pinMat);
+    pin.visible = false;
+    scene.add(pin);
+
+    // Pulsing ring around pin
+    const ringGeo = new THREE.TorusGeometry(0.05, 0.005, 8, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xff5577, transparent: true, opacity: .8 });
+    const pinRing = new THREE.Mesh(ringGeo, ringMat);
+    pinRing.visible = false;
+    scene.add(pinRing);
+
+    /* ── Raycaster ─────────────────────────────────────────────── */
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let selectedLat = null, selectedLon = null, selectedName = '';
+    let inputMode = false;
+
+    function getLatLon(pt) {
+      const local = earth.worldToLocal(pt.clone()).normalize();
+      const lat = Math.asin(Math.max(-1, Math.min(1, local.y))) * (180 / Math.PI);
+      const lon = Math.atan2(-local.z, local.x) * (180 / Math.PI);
+      return { lat: parseFloat(lat.toFixed(4)), lon: parseFloat(lon.toFixed(4)) };
+    }
+
+    globeCanvas.addEventListener('mousemove', e => {
+      if (!inputMode) return;
+      const rect = globeCanvas.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObject(earth);
+      const tip = document.getElementById('tip');
+      if (hits.length) {
+        globeCanvas.style.cursor = 'crosshair';
+        const { lat, lon } = getLatLon(hits[0].point);
+        document.getElementById('tip-name').textContent = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`;
+        document.getElementById('tip-coord').textContent = '';
+        document.getElementById('tip-hint').textContent = 'Click to select this location';
+        tip.style.left = (e.clientX + 14) + 'px';
+        tip.style.top = (e.clientY - 40) + 'px';
+        tip.classList.add('show');
+      } else {
+        globeCanvas.style.cursor = 'grab';
+        tip.classList.remove('show');
+      }
+    });
+
+    globeCanvas.addEventListener('mouseleave', () => {
+      document.getElementById('tip').classList.remove('show');
+    });
+
+    globeCanvas.addEventListener('click', e => {
+      if (!inputMode) return;
+      const rect = globeCanvas.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObject(earth);
+      if (!hits.length) return;
+
+      const { lat, lon } = getLatLon(hits[0].point);
+      selectedLat = lat; selectedLon = lon;
+
+      // Place pin
+      const pinPos = hits[0].point.clone().multiplyScalar(1.025);
+      pin.position.copy(pinPos);
+      pin.visible = true;
+      pinRing.position.copy(pinPos);
+      // Orient ring to face outward
+      pinRing.lookAt(0, 0, 0);
+      pinRing.visible = true;
+
+      // Update UI
+      const locDisplay = document.getElementById('loc-display');
+      const locCoord = document.getElementById('loc-coord');
+      locDisplay.innerHTML = `<span>📍 ${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? 'E' : 'W'}</span><span>▾</span>`;
+      locDisplay.classList.add('selected');
+      locCoord.textContent = '';
+      selectedName = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`;
+
+      // Async reverse geocode
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.address) {
+            const city = d.address.city || d.address.town || d.address.village || d.address.county || '';
+            const country = d.address.country || '';
+            const name = [city, country].filter(Boolean).join(', ');
+            if (name) {
+              selectedName = name;
+              locDisplay.innerHTML = `<span>📍 ${name}</span><span>▾</span>`;
+              locCoord.textContent = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`;
+            }
+          }
+        }).catch(() => { });
+    });
+
+    /* ── Resize handler ────────────────────────────────────────── */
+    const ro = new ResizeObserver(() => {
+      const w = globeWrap.clientWidth, h = globeWrap.clientHeight;
+      if (w && h) {
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+    });
+    ro.observe(globeWrap);
+
+    /* ── Animation loop ────────────────────────────────────────── */
+    let autoRot = true;
+    function animate() {
+      requestAnimationFrame(animate);
+      if (autoRot && !controls.enabled) {
+        earth.rotation.y += 0.0012;
+      }
+      // Pulse pin ring
+      if (pinRing.visible) {
+        const scale = 1 + 0.2 * Math.sin(Date.now() * 0.004);
+        pinRing.scale.setScalar(scale);
+        ringMat.opacity = 0.6 + 0.4 * Math.sin(Date.now() * 0.004);
+      }
+      // Orbit ring slow rotation
+      orbitRing.rotation.z += 0.0003;
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    /* ─────────────────────────────────────────────────────────────────
+       TRANSITIONS
+    ───────────────────────────────────────────────────────────────── */
+    let transitioning = false;
+    document.getElementById('btn-explore').addEventListener('click', () => {
+      if (transitioning) return;
+      transitioning = true;
+
+      // 1. Fade out landing
+      const landing = document.getElementById('page-landing');
+      landing.classList.add('hide');
+
+      // 2. After brief delay, move globe and show input
+      setTimeout(() => {
+        globeWrap.classList.add('input-mode');
+        inputMode = true;
+        controls.enabled = true;
+        autoRot = false;
+        earth.rotation.y = 0; // Reset for consistent orientation
+
+        setTimeout(() => {
+          document.getElementById('page-input').classList.add('show');
+        }, 200);
+      }, 400);
+    });
+
+    /* ─────────────────────────────────────────────────────────────────
+       YEAR SLIDER
+    ───────────────────────────────────────────────────────────────── */
+    const yearSlider = document.getElementById('year-slider');
+    const yearVal = document.getElementById('year-val');
+    function updateSlider() {
+      const pct = ((yearSlider.value - yearSlider.min) / (yearSlider.max - yearSlider.min)) * 100;
+      yearSlider.style.setProperty('--pct', pct + '%');
+      yearVal.textContent = yearSlider.value;
+    }
+    yearSlider.addEventListener('input', updateSlider);
+    updateSlider();
+
+    /* ─────────────────────────────────────────────────────────────────
+       MONTH PILLS
+    ───────────────────────────────────────────────────────────────── */
+    let selectedMonth = 0; // 0 = all year
+    document.querySelectorAll('.month-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.month-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        selectedMonth = parseInt(pill.dataset.m);
+      });
+    });
+    // Default: All
+    document.querySelector('.month-pill[data-m="0"]').classList.add('active');
+
+    /* ─────────────────────────────────────────────────────────────────
+       NetCDF UPLOAD
+    ───────────────────────────────────────────────────────────────── */
+    let ncFilepath = null;
+    document.getElementById('nc-file').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const status = document.getElementById('nc-status');
+      status.textContent = 'Uploading…';
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        const r = await fetch('/api/upload-nc', { method: 'POST', body: form });
+        const d = await r.json();
+        if (d.success) {
+          ncFilepath = d.filepath;
+          status.textContent = `✓ Loaded: ${d.variables.join(', ')} (${Object.values(d.dims)[0]} steps)`;
+        } else {
+          status.textContent = `Error: ${d.error}`;
+        }
+      } catch {
+        status.textContent = 'Upload failed (check Flask server)';
+      }
+    });
+
+    /* ─────────────────────────────────────────────────────────────────
+       SUBMIT
+    ───────────────────────────────────────────────────────────────── */
+    document.getElementById('btn-submit').addEventListener('click', async () => {
+      if (!selectedLat || !selectedLon) {
+        // Highlight globe
+        document.getElementById('loc-display').style.borderColor = 'var(--purple)';
+        setTimeout(() => document.getElementById('loc-display').style.borderColor = '', 1500);
+        return;
+      }
+
+      const btn = document.getElementById('btn-submit');
+      btn.classList.add('loading');
+      btn.textContent = 'Loading…';
+      document.getElementById('loading-overlay').classList.add('show');
+
+      const payload = {
+        lat: selectedLat,
+        lon: selectedLon,
+        year: parseInt(document.getElementById('year-slider').value),
+        month: selectedMonth === 0 ? null : selectedMonth,
+        variable: document.getElementById('var-select').value,
+        location_name: selectedName,
+      };
+
+      try {
+        const r = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await r.json();
+        if (data.success) {
+          sessionStorage.setItem('climateData', JSON.stringify(data));
+          window.location.href = '/results';
+        } else {
+          throw new Error(data.error || 'API error');
+        }
+      } catch (err) {
+        document.getElementById('loading-overlay').classList.remove('show');
+        btn.classList.remove('loading');
+        btn.textContent = 'Submit';
+        alert('Error fetching data: ' + err.message);
+      }
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PyClimaExplorer — Results</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Exo+2:wght@300;400;500;600&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #00050f;
+      --cyan: #4ad4e8;
+      --cyan2: #3ab8cc;
+      --purple: #a78bfa;
+      --gold: #f0b429;
+      --green: #68d391;
+      --muted: #95cadc;
+      --text: #e8f4f8;
+      --card: rgba(0, 15, 35, 0.88);
+      --border: rgba(100, 220, 255, 0.18);
+      --font-h: 'Orbitron', monospace;
+      --font-b: 'Exo 2', sans-serif;
+    }
+
+    html,
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-b);
+      min-height: 100vh;
+      overflow-x: hidden
+    }
+
+    #stars-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none
+    }
+
+    .nebula {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: radial-gradient(ellipse 55% 35% at 15% 85%, rgba(74, 212, 232, 0.03) 0%, transparent 70%),
+        radial-gradient(ellipse 45% 30% at 85% 15%, rgba(167, 139, 250, 0.04) 0%, transparent 65%)
+    }
+
+    #page-wrap {
+      position: relative;
+      z-index: 10;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity .8s ease, transform .8s ease
+    }
+
+    #page-wrap.visible {
+      opacity: 1;
+      transform: translateY(0)
+    }
+
+    /* ── Context bar ── */
+    .ctx-bar {
+      background: rgba(0, 10, 25, 0.97);
+      border-bottom: 1px solid rgba(100, 220, 255, 0.2);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(12px)
+    }
+
+    .ctx-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      flex-shrink: 0
+    }
+
+    .ctx-crumb {
+      font-size: 12px;
+      color: #bdeaff;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-family: var(--font-h)
+    }
+
+    .ctx-crumb span {
+      color: #fff;
+      margin: 0 6px;
+      opacity: .4
+    }
+
+    .ctx-pill {
+      font-size: 11px;
+      background: rgba(100, 220, 255, 0.08);
+      border: 1px solid rgba(100, 220, 255, 0.28);
+      color: var(--cyan);
+      padding: 4px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background .2s, box-shadow .2s;
+      font-family: var(--font-h);
+      letter-spacing: .04em
+    }
+
+    .ctx-pill:hover {
+      background: rgba(100, 220, 255, 0.16);
+      box-shadow: 0 0 12px rgba(74, 212, 232, 0.2)
+    }
+
+    .ctx-pill.purple {
+      border-color: rgba(167, 139, 250, 0.28);
+      color: var(--purple);
+      background: rgba(167, 139, 250, 0.08)
+    }
+
+    /* ── Section title ── */
+    .section-title {
+      font-size: 13px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--cyan2);
+      margin: 0 0 10px;
+      font-family: var(--font-h)
+    }
+
+    /* ── Glass ── */
+    .glass {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      transition: border-color .2s
+    }
+
+    .glass:hover {
+      border-color: rgba(100, 220, 255, 0.3)
+    }
+
+    .glass-accent {
+      border-color: rgba(100, 220, 255, 0.45) !important
+    }
+
+    /* ── Stat cards ── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 0 24px 20px
+    }
+
+    @media(max-width:700px) {
+      .stat-row {
+        grid-template-columns: repeat(2, 1fr)
+      }
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity .5s ease, transform .5s ease, box-shadow .2s
+    }
+
+    .stat-card.visible {
+      opacity: 1;
+      transform: translateY(0)
+    }
+
+    .stat-card:hover {
+      box-shadow: 0 0 20px rgba(74, 212, 232, 0.1);
+      border-color: rgba(100, 220, 255, 0.35)
+    }
+
+    .stat-val {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--cyan);
+      line-height: 1;
+      font-family: var(--font-h)
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--cyan2);
+      margin-top: 5px;
+      letter-spacing: .06em
+    }
+
+    .stat-sub {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 3px
+    }
+
+    .stat-badge {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: rgba(74, 212, 232, 0.1);
+      color: var(--cyan);
+      border: 1px solid rgba(74, 212, 232, 0.25)
+    }
+
+    .stat-badge.warn {
+      background: rgba(240, 180, 40, 0.1);
+      color: var(--gold);
+      border-color: rgba(240, 180, 40, 0.25)
+    }
+
+    .stat-badge.danger {
+      background: rgba(248, 113, 113, 0.1);
+      color: #f87171;
+      border-color: rgba(248, 113, 113, 0.25)
+    }
+
+    .stat-badge.good {
+      background: rgba(104, 211, 145, 0.1);
+      color: var(--green);
+      border-color: rgba(104, 211, 145, 0.25)
+    }
+
+    /* ── Two-col ── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 0 24px 20px
+    }
+
+    @media(max-width:768px) {
+      .two-col {
+        grid-template-columns: 1fr
+      }
+    }
+
+    /* ── AI panel ── */
+    .ai-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%
+    }
+
+    .ai-tag {
+      display: inline-block;
+      font-size: 10px;
+      background: rgba(100, 220, 255, 0.12);
+      border: 1px solid rgba(100, 220, 255, 0.35);
+      color: var(--cyan);
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: .07em;
+      font-family: var(--font-h)
+    }
+
+    .ai-tag.ev {
+      background: rgba(167, 139, 250, 0.12);
+      border-color: rgba(167, 139, 250, 0.35);
+      color: var(--purple)
+    }
+
+    .ai-anomaly {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--purple);
+      margin: 2px 0;
+      font-family: var(--font-h)
+    }
+
+    .ai-baseline {
+      font-size: 11px;
+      color: var(--cyan2);
+      margin-top: -4px
+    }
+
+    .ai-stats-row {
+      display: flex;
+      gap: 20px;
+      margin: 6px 0;
+      flex-wrap: wrap
+    }
+
+    .ai-stat {
+      text-align: center
+    }
+
+    .ai-stat-val {
+      font-size: 15px;
+      font-weight: 700;
+      font-family: var(--font-h)
+    }
+
+    .ai-stat-lbl {
+      font-size: 10px;
+      color: var(--muted)
+    }
+
+    /* AI chat area */
+    .ai-response {
+      font-size: 12px;
+      line-height: 1.8;
+      color: #a8ccd8;
+      background: rgba(74, 212, 232, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 90px;
+      flex: 1;
+      transition: border-color .2s;
+      white-space: pre-wrap;
+      word-wrap: break-word
+    }
+
+    .ai-response.streaming {
+      border-color: rgba(74, 212, 232, 0.45)
+    }
+
+    .ai-response.empty {
+      color: var(--muted);
+      font-style: italic
+    }
+
+    .ai-input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px
+    }
+
+    .ai-input {
+      flex: 1;
+      background: rgba(74, 212, 232, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-family: var(--font-b);
+      font-size: 12px;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s
+    }
+
+    .ai-input:focus {
+      border-color: var(--cyan)
+    }
+
+    .ai-input::placeholder {
+      color: var(--muted)
+    }
+
+    .ai-send-btn {
+      background: linear-gradient(135deg, var(--cyan), #00a8c0);
+      border: none;
+      border-radius: 6px;
+      padding: 9px 16px;
+      font-family: var(--font-h);
+      font-size: 9px;
+      letter-spacing: .08em;
+      color: var(--bg);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: box-shadow .2s, opacity .2s
+    }
+
+    .ai-send-btn:hover {
+      box-shadow: 0 0 16px rgba(74, 212, 232, 0.4)
+    }
+
+    .ai-send-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed
+    }
+
+    .ai-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 12px;
+      background: var(--cyan);
+      margin-left: 2px;
+      animation: blink .7s infinite
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0
+      }
+    }
+
+    /* ── City analogue ── */
+    .city-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px
+    }
+
+    .city-card {
+      background: rgba(0, 25, 55, 0.5);
+      border: 1px solid rgba(100, 220, 255, 0.12);
+      border-radius: 8px;
+      padding: 9px 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: border-color .2s;
+      cursor: pointer
+    }
+
+    .city-card:hover {
+      background: rgba(0, 35, 70, 0.6);
+      border-color: rgba(100, 220, 255, 0.28)
+    }
+
+    .city-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff
+    }
+
+    .city-meta {
+      font-size: 11px;
+      color: var(--cyan2);
+      margin-top: 2px
+    }
+
+    .match-badge {
+      font-size: 11px;
+      background: rgba(167, 139, 250, 0.14);
+      border: 1px solid rgba(167, 139, 250, 0.3);
+      color: var(--purple);
+      padding: 3px 10px;
+      border-radius: 20px;
+      flex-shrink: 0
+    }
+
+    /* ── RCP ── */
+    .rcp-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 0 24px 20px
+    }
+
+    @media(max-width:600px) {
+      .rcp-row {
+        grid-template-columns: 1fr
+      }
+    }
+
+    .rcp-card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 14px;
+      border: 1px solid var(--border)
+    }
+
+    .rcp-label {
+      font-size: 10px;
+      letter-spacing: .1em;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-family: var(--font-h)
+    }
+
+    .rcp-val-big {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 6px;
+      font-family: var(--font-h)
+    }
+
+    .rcp-desc {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 3px;
+      line-height: 1.5
+    }
+
+    /* ── RCP mini canvas ── */
+    canvas.rcp-canvas {
+      display: block;
+      width: 100%;
+      height: 60px;
+      margin: 6px 0
+    }
+
+    /* ── Story ── */
+    .story-steps {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap
+    }
+
+    .story-btn {
+      font-size: 10px;
+      letter-spacing: .07em;
+      color: var(--muted);
+      background: rgba(74, 212, 232, 0.04);
+      border: 1px solid rgba(74, 212, 232, 0.15);
+      border-radius: 20px;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: all .2s;
+      text-transform: uppercase;
+      font-family: var(--font-h)
+    }
+
+    .story-btn:hover,
+    .story-btn.active {
+      color: var(--bg);
+      background: var(--cyan);
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(74, 212, 232, 0.35)
+    }
+
+    .story-content {
+      font-size: 15px;
+      line-height: 1.8;
+      color: #7aaabb;
+      background: rgba(74, 212, 232, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 70px;
+      transition: opacity .25s
+    }
+
+    /* ── Year slider ── */
+    .yr-slider {
+      flex: 1;
+      height: 3px;
+      appearance: none;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+      background: linear-gradient(to right, var(--cyan) 100%, rgba(74, 212, 232, 0.18) 100%)
+    }
+
+    .yr-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 13px;
+      height: 13px;
+      background: var(--cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 7px rgba(74, 212, 232, 0.6);
+      cursor: pointer
+    }
+
+    /* ── Map loading spinner ── */
+    .map-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 5, 18, 0.7);
+      z-index: 10;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s
+    }
+
+    .map-loading.show {
+      opacity: 1;
+      pointer-events: auto
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 2px solid rgba(74, 212, 232, 0.2);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin .8s linear infinite
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    /* ── Source badge ── */
+    .source-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 9px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #2a5a6a;
+      font-family: var(--font-h)
+    }
+
+    .source-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 5px var(--green)
+    }
+
+    /* ── Footer ── */
+    .footer-bar {
+      background: rgba(0, 5, 18, 0.95);
+      border-top: 1px solid rgba(100, 220, 255, 0.1);
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      gap: 8px
+    }
+
+    .footer-btn {
+      font-size: 11px;
+      background: rgba(100, 220, 255, 0.07);
+      border: 1px solid rgba(100, 220, 255, 0.25);
+      color: var(--cyan);
+      padding: 6px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all .2s;
+      font-family: var(--font-h);
+      letter-spacing: .05em
+    }
+
+    .footer-btn:hover {
+      background: rgba(100, 220, 255, 0.14);
+      box-shadow: 0 0 12px rgba(74, 212, 232, 0.18)
+    }
+
+    .footer-btn.primary {
+      color: var(--bg);
+      background: linear-gradient(135deg, var(--cyan), #00a8c0);
+      border: none;
+      box-shadow: 0 0 16px rgba(74, 212, 232, 0.25)
+    }
+
+    .footer-btn.primary:hover {
+      box-shadow: 0 0 28px rgba(74, 212, 232, 0.45)
+    }
+
+    /* ── Fade up ── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity .6s ease, transform .6s ease
+    }
+
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0)
+    }
+
+    /* ── No data ── */
+    .no-data {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 16px;
+      font-family: var(--font-h);
+      color: var(--muted)
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(74, 212, 232, 0.18);
+      border-radius: 3px
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="stars-canvas"></canvas>
+  <div class="nebula"></div>
+  <div id="page-wrap">
+    <div id="results-body"></div>
+  </div>
+
+  <script>
+    /* ── Stars ──────────────────────────────────────────────────── */
+    (function () {
+      const c = document.getElementById('stars-canvas'), ctx = c.getContext('2d'); let S = [];
+      function resize() {
+        c.width = innerWidth; c.height = innerHeight;
+        S = Array.from({ length: 260 }, () => ({
+          x: Math.random() * c.width, y: Math.random() * c.height,
+          r: Math.random() * 1.3 + 0.2, a: Math.random(), da: (Math.random() - .5) * 0.0022
+        }))
+      }
+      function draw() {
+        ctx.clearRect(0, 0, c.width, c.height);
+        S.forEach(s => {
+          s.a = Math.max(0, Math.min(1, s.a + s.da)); if (s.a <= 0 || s.a >= 1) s.da *= -1;
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(200,235,255,${s.a})`; ctx.fill()
+        });
+        requestAnimationFrame(draw)
+      }
+      resize(); draw(); window.addEventListener('resize', resize);
+    })();
+
+    /* ── Plotly helpers ──────────────────────────────────────────── */
+    const PCFG = {
+      responsive: true, displaylogo: false,
+      scrollZoom: false,
+      modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toImage', 'zoom2d', 'pan2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d']
+    };
+    const BL = {
+      paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,10,28,0.55)',
+      font: { color: '#8ab8c8', family: 'Exo 2,sans-serif', size: 10 },
+      legend: {
+        bgcolor: 'rgba(0,8,24,0.8)', bordercolor: 'rgba(74,212,232,0.18)',
+        borderwidth: 1, font: { size: 9 }
+      },
+      hoverlabel: {
+        bgcolor: 'rgba(0,12,35,0.95)', bordercolor: 'rgba(74,212,232,0.4)',
+        font: { color: 'white', size: 11 }
+      }
+    };
+    const XA = {
+      gridcolor: 'rgba(74,212,232,0.07)', linecolor: 'rgba(74,212,232,0.2)',
+      zerolinecolor: 'rgba(74,212,232,0.12)', tickcolor: '#4ad4e8'
+    };
+    const YA = {
+      gridcolor: 'rgba(74,212,232,0.07)', linecolor: 'rgba(74,212,232,0.2)',
+      zerolinecolor: 'rgba(74,212,232,0.12)', tickcolor: '#4ad4e8'
+    };
+
+    function renderChart(id, fig, extra) {
+      if (!fig || !fig.data) return;
+      const lay = Object.assign({}, BL, fig.layout || {}, extra || {});
+      lay.paper_bgcolor = 'rgba(0,0,0,0)'; lay.plot_bgcolor = 'rgba(0,10,28,0.55)';
+      lay.font = { color: '#8ab8c8', family: 'Exo 2,sans-serif', size: 10 };
+      if (lay.xaxis) lay.xaxis = Object.assign({}, XA, lay.xaxis);
+      if (lay.yaxis) lay.yaxis = Object.assign({}, YA, lay.yaxis);
+      Plotly.newPlot(id, fig.data, lay, PCFG);
+    }
+
+    /* ── RCP mini canvas ──────────────────────────────────────────── */
+    function drawRCP(id, base, slope, color) {
+      const c = document.getElementById(id); if (!c) return;
+      const ctx = c.getContext('2d'), W = c.width, H = c.height;
+      ctx.clearRect(0, 0, W, H);
+      const pts = []; for (let i = 0; i < 50; i++)pts.push(base + i * slope * 0.05 + (Math.random() - .5) * 0.4);
+      const mn = Math.min(...pts) - 0.3, mx = Math.max(...pts) + 0.3;
+      const toY = v => H - 4 - (v - mn) / (mx - mn) * (H - 8);
+      const toX = i => 4 + i * (W - 8) / 49;
+      ctx.strokeStyle = 'rgba(0,60,100,0.18)'; ctx.lineWidth = 0.5;
+      [0.25, 0.5, 0.75].forEach(f => { const y = 4 + f * (H - 8); ctx.beginPath(); ctx.moveTo(4, y); ctx.lineTo(W - 4, y); ctx.stroke() });
+      ctx.beginPath();
+      pts.forEach((v, i) => i === 0 ? ctx.moveTo(toX(i), toY(v + 0.3)) : ctx.lineTo(toX(i), toY(v + 0.3)));
+      pts.slice().reverse().forEach((v, i) => ctx.lineTo(toX(49 - i), toY(v - 0.2)));
+      ctx.closePath(); ctx.fillStyle = color + '18'; ctx.fill();
+      ctx.beginPath();
+      pts.forEach((v, i) => i === 0 ? ctx.moveTo(toX(i), toY(v)) : ctx.lineTo(toX(i), toY(v)));
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = color + 'bb'; ctx.font = '8px Exo 2,sans-serif';
+      ctx.textAlign = 'left'; ctx.fillText('2024', 5, H - 2);
+      ctx.textAlign = 'right'; ctx.fillText('2060', W - 2, H - 2);
+    }
+
+    /* ── Load data ───────────────────────────────────────────────── */
+    const raw = sessionStorage.getItem('climateData');
+    if (!raw) {
+      document.getElementById('results-body').innerHTML = `
+    <div class="no-data">
+      <div style="font-size:44px;opacity:.3">🌐</div>
+      <h2 style="font-size:14px;letter-spacing:.08em;color:#3ab8cc">No Data Found</h2>
+      <p style="font-size:12px;color:#2a5a6a;text-align:center;max-width:260px;line-height:1.6">
+        Please go back and submit a location query first.</p>
+      <button class="footer-btn primary" onclick="window.location.href='/'">← Go Back</button>
+    </div>`;
+      document.getElementById('page-wrap').classList.add('visible');
+    } else {
+      build(JSON.parse(raw));
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       MAIN BUILD
+    ══════════════════════════════════════════════════════════════ */
+    function build(D) {
+      const loc = D.location, stats = D.stats, rcp = D.rcp_proj_2045;
+      const unit = D.unit, varLabel = D.variable_label;
+      const anomSign = stats.anomaly >= 0 ? '+' : '';
+
+      /* Analogue cities */
+      const analogues = D.analogues || [];
+
+      /* Story tour */
+      const stories = [
+        { label: '📍 Now', text: `At <strong>${loc.name}</strong> in <strong>${D.month_name} ${D.year}</strong>, the ${varLabel.toLowerCase()} measured <strong>${D.current_fmt}</strong> from real ERA5 reanalysis data — classified as <em>${D.classification}</em>. This is ${anomSign}${stats.anomaly.toFixed(3)} ${unit} relative to the 1980–2010 climatological baseline.` },
+        { label: '📈 Trend', text: `Since 1950, the ${varLabel.toLowerCase()} at this location has shifted at <strong>${anomSign}${stats.trend_per_decade.toFixed(4)} ${unit}/decade</strong> according to ERA5. The most recent annual value is ${anomSign}${stats.anomaly.toFixed(3)} ${unit} from the baseline — a ${Math.abs(stats.anomaly) > 2 ? '<strong style="color:#f87171">significant</strong>' : 'moderate'} departure with clear climate signal.` },
+        { label: '🌀 Season', text: `The full seasonal cycle at this location spans <strong>${stats.seasonal_min} ${unit}</strong> to <strong>${stats.seasonal_max} ${unit}</strong> — a range of ${(stats.seasonal_max - stats.seasonal_min).toFixed(3)} ${unit}. ${D.month_name} sits ${D.current_value > stats.baseline_mean ? 'above' : 'below'} the annual mean of ${stats.baseline_mean} ${unit}.` },
+        { label: '🔭 Future', text: `By 2045 — based on the ERA5 baseline of ${stats.baseline_mean} ${unit}: <strong style="color:#4ad4e8">RCP 2.6 → ${rcp['2.6']} ${unit}</strong> · <strong style="color:#f0b429">RCP 4.5 → ${rcp['4.5']} ${unit}</strong> · <strong style="color:#a78bfa">RCP 8.5 → ${rcp['8.5']} ${unit}</strong>. The scenario spread of ${(rcp['8.5'] - rcp['2.6']).toFixed(3)} ${unit} represents the difference between aggressive action and business-as-usual.` },
+      ];
+
+      function anomClass(v) { return Math.abs(v) > 2 ? 'danger' : Math.abs(v) > 0.5 ? 'warn' : 'good' }
+
+      /* ── HTML ─────────────────────────────────────────────────── */
+      document.getElementById('results-body').innerHTML = `
+
+  <!-- Context bar -->
+  <div class="ctx-bar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="ctx-dot"></div>
+      <span class="ctx-crumb">${loc.name}<span>·</span>${D.month_name} ${D.year}<span>·</span>${varLabel}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="source-badge"><div class="source-dot"></div>ERA5 Real Data</div>
+      <div class="ctx-pill" onclick="window.location.href='/'">Edit Selection</div>
+      <div class="ctx-pill" id="btn-share">Share</div>
+    </div>
+  </div>
+
+  <!-- Regional heatmap -->
+  <div style="padding:16px 24px 0">
+    <div class="section-title">Regional ${varLabel} — ${D.month_name} ${D.year} (±12° around location)</div>
+    <div class="glass" style="padding:0;overflow:hidden;position:relative">
+      <div id="chart-map" style="height:340px"></div>
+      <div class="map-loading" id="map-loading">
+        <div style="text-align:center">
+          <div class="spinner"></div>
+          <div style="margin-top:8px;font-size:10px;color:var(--cyan);font-family:var(--font-h);letter-spacing:.08em">Fetching ERA5 data…</div>
+        </div>
+      </div>
+      <!-- Location overlay -->
+      <div style="position:absolute;top:16px;left:16px;pointer-events:none;z-index:5">
+        <div style="background:rgba(0,8,24,0.85);backdrop-filter:blur(8px);border:1px solid rgba(74,212,232,0.6);box-shadow:0 8px 32px rgba(0,0,0,0.5);border-radius:8px;padding:12px 16px;font-size:12px;min-width:200px">
+          <div style="font-weight:700;font-size:14px;color:var(--text);font-family:var(--font-h);letter-spacing:0.05em;margin-bottom:4px">${loc.name}</div>
+          <div style="color:var(--cyan2);margin-bottom:6px">${Math.abs(loc.lat).toFixed(2)}°${loc.lat >= 0 ? 'N' : 'S'}, ${Math.abs(loc.lon).toFixed(2)}°${loc.lon >= 0 ? 'E' : 'W'}</div>
+          <div style="color:var(--purple);margin-bottom:4px;font-size:13px">${varLabel}: <b id="map-val-display" style="font-size:14px">${D.current_fmt}</b></div>
+          <div style="color:var(--cyan);font-weight:600">Category: <b style="color:var(--gold)">${D.classification}</b></div>
+        </div>
+      </div>
+    </div>
+    <!-- Year slider -->
+    <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+      <span style="font-size:10px;color:var(--muted)">1950</span>
+      <input type="range" min="1950" max="2023" value="${D.year}" id="yr-slider" class="yr-slider">
+      <span style="font-size:12px;font-weight:700;color:var(--cyan);min-width:40px;font-family:var(--font-h);text-align:right" id="yr-label">${D.year}</span>
+      <div class="ctx-pill" id="btn-animate">▶ Animate</div>
+      <div class="ctx-pill purple" id="btn-reset-year">Reset</div>
+    </div>
+    <div style="font-size:13px;color:var(--muted);margin-top:6px;font-family:var(--font-b)">
+      ↑ Drag slider to update the regional heatmap for any year (1950–2023) using real ERA5 data
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stat-row" style="margin-top:40px">
+    <div class="stat-card" style="transition-delay:.04s">
+      <div class="stat-val">${D.current_fmt.split(' ')[0]}</div>
+      <div class="stat-label">${varLabel}</div>
+      <div class="stat-sub">${D.month_name} ${D.year} · ERA5</div>
+      <span class="stat-badge">${D.classification}</span>
+    </div>
+    <div class="stat-card" style="transition-delay:.08s">
+      <div class="stat-val" style="color:${stats.anomaly > 0 ? 'var(--gold)' : 'var(--green)'};font-size:22px">${anomSign}${stats.anomaly.toFixed(3)}</div>
+      <div class="stat-label">Anomaly (${unit})</div>
+      <div class="stat-sub">vs 1980–2010 baseline</div>
+      <span class="stat-badge ${anomClass(stats.anomaly)}">${stats.anomaly > 0 ? 'Above' : 'Below'} Normal</span>
+    </div>
+    <div class="stat-card" style="transition-delay:.12s">
+      <div class="stat-val" style="color:${stats.trend_per_decade > 0 ? '#f87171' : 'var(--green)'};font-size:18px">${stats.trend_per_decade > 0 ? '+' : ''}${stats.trend_per_decade.toFixed(4)}</div>
+      <div class="stat-label">Trend (${unit}/decade)</div>
+      <div class="stat-sub">ERA5 linear 1950–2023</div>
+    </div>
+    <div class="stat-card" style="transition-delay:.16s">
+      <div class="stat-val" style="font-size:15px">${stats.seasonal_min}–${stats.seasonal_max}</div>
+      <div class="stat-label">Seasonal Range</div>
+      <div class="stat-sub">${unit} · full year</div>
+    </div>
+  </div>
+
+  <!-- Time series + AI analyst -->
+  <div class="two-col" style="margin-top:40px">
+    <div>
+      <div class="section-title">Historical Time Series — ERA5 (${loc.name})</div>
+      <div class="glass" style="padding:14px">
+        <div id="chart-ts" style="height:240px"></div>
+        <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="width:16px;height:2px;background:#4ad4e8"></div>
+            <span style="font-size:10px;color:var(--cyan2)">Annual Mean (ERA5)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="width:16px;height:2px;background:#f0b429"></div>
+            <span style="font-size:10px;color:var(--cyan2)">Linear Trend</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">AI Climate Analyst</div>
+      <div class="glass glass-accent" style="height:calc(100% - 24px)">
+        <div class="ai-panel">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="ai-tag ${Math.abs(stats.anomaly) > 1.5 ? 'ev' : ''}">ERA5 ANALYSIS</span>
+            <span style="font-size:10px;color:var(--muted)">Real data · Google Gemini</span>
+          </div>
+          <div class="ai-anomaly">${anomSign}${stats.anomaly.toFixed(3)} ${unit}</div>
+          <div class="ai-baseline">vs 1980–2010 baseline of ${stats.baseline_mean} ${unit}</div>
+          <div class="ai-stats-row">
+            <div class="ai-stat">
+              <div class="ai-stat-val" style="color:var(--cyan)">${D.current_fmt.split(' ')[0]}</div>
+              <div class="ai-stat-lbl">Current</div>
+            </div>
+            <div class="ai-stat">
+              <div class="ai-stat-val" style="color:var(--gold)">${D.classification}</div>
+              <div class="ai-stat-lbl">Category</div>
+            </div>
+            <div class="ai-stat">
+              <div class="ai-stat-val" style="color:var(--purple)">${stats.trend_per_decade > 0 ? '+' : ''}${stats.trend_per_decade.toFixed(4)}</div>
+              <div class="ai-stat-lbl">${unit}/decade</div>
+            </div>
+          </div>
+          <div class="ai-response empty" id="ai-response">
+            Click "Analyse" to get AI-powered climate insights based on real ERA5 data.
+          </div>
+          <div class="ai-input-row">
+            <input class="ai-input" id="ai-input" type="text"
+              placeholder="Ask about anomaly causes, projections, impacts…">
+            <button class="ai-send-btn" id="ai-send-btn" onclick="sendAI()">Analyse ↗</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Seasonal + Comparison -->
+  <div class="two-col" style="margin-top:24px">
+    <div>
+      <div class="section-title">Seasonal Climatology — ERA5 ${D.year}</div>
+      <div class="glass" style="padding:14px">
+        <div id="chart-mon" style="height:220px"></div>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">1990 vs 2020 — ERA5 Comparison</div>
+      <div class="glass" style="padding:14px">
+        <div id="chart-cmp" style="height:220px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analogue finder -->
+  <div style="padding:20px 24px 20px" class="fade-up">
+    <div class="section-title">${varLabel} Analogue Finder — Where does ${loc.name}'s 2050 profile exist today?</div>
+    <div class="glass">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start">
+        <div id="chart-analogue" style="height:220px;width:100%;border-radius:6px;overflow:hidden"></div>
+        <div class="city-list" style="min-width:220px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Cities matching projected 2050 profile</div>
+          ${analogues.map(c => `
+            <div class="city-card">
+              <div><div class="city-name">${c.name}</div>
+              <div class="city-meta">${c.meta}</div></div>
+              <div class="match-badge">${c.match}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full RCP chart -->
+  <div style="padding:20px 24px 8px" class="fade-up">
+    <div class="section-title">Climate Projections 2024–2060 (Based on ERA5 Baseline)</div>
+    <div class="glass" style="padding:14px;margin-bottom:16px">
+      <div id="chart-rcp" style="height:250px"></div>
+    </div>
+  </div>
+
+  <!-- RCP mini cards -->
+  <div class="rcp-row">
+    <div class="rcp-card" style="border-color:rgba(74,212,232,0.3)">
+      <div class="rcp-label" style="color:#4ad4e8">RCP 2.6 — Stabilised</div>
+      <canvas id="rcp26" class="rcp-canvas" width="220" height="60"></canvas>
+      <div class="rcp-val-big" style="color:#4ad4e8">${rcp['2.6']} <span style="font-size:11px;color:var(--muted)">${unit} by 2045</span></div>
+      <div class="rcp-desc">Aggressive mitigation. Global warming below 2°C.</div>
+    </div>
+    <div class="rcp-card" style="border-color:rgba(240,180,40,0.3)">
+      <div class="rcp-label" style="color:#f0b429">RCP 4.5 — Moderate</div>
+      <canvas id="rcp45" class="rcp-canvas" width="220" height="60"></canvas>
+      <div class="rcp-val-big" style="color:#f0b429">${rcp['4.5']} <span style="font-size:11px;color:var(--muted)">${unit} by 2045</span></div>
+      <div class="rcp-desc">Policy stabilisation. Intermediate pathway.</div>
+    </div>
+    <div class="rcp-card" style="border-color:rgba(167,139,250,0.3)">
+      <div class="rcp-label" style="color:#a78bfa">RCP 8.5 — High Emissions</div>
+      <canvas id="rcp85" class="rcp-canvas" width="220" height="60"></canvas>
+      <div class="rcp-val-big" style="color:#a78bfa">${rcp['8.5']} <span style="font-size:11px;color:var(--muted)">${unit} by 2045</span></div>
+      <div class="rcp-desc">Business-as-usual. Highest radiative forcing.</div>
+    </div>
+  </div>
+
+  <!-- Guided story -->
+  <div style="padding:20px 24px 20px" class="fade-up">
+    <div class="section-title">Guided Climate Story Tour</div>
+    <div class="glass">
+      <div class="story-steps">
+        ${stories.map((s, i) => `<button class="story-btn${i === 0 ? ' active' : ''}" data-i="${i}">${s.label}</button>`).join('')}
+      </div>
+      <div class="story-content" id="story-content">${stories[0].text}</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer-bar" style="margin-top:40px">
+    <div style="font-size:10px;color:var(--muted);font-family:var(--font-h);letter-spacing:.05em">
+      PyClimaExplorer · TECHNEX'26 · IIT BHU · ERA5 Real Data
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="footer-btn" onclick="window.location.href='/'">← New Query</button>
+      <button class="footer-btn primary" id="btn-csv">⬇ Export CSV</button>
+    </div>
+  </div>
+  `;
+
+      /* ── Render Plotly charts ──────────────────────────────────── */
+      const ch = D.charts;
+      renderChart('chart-map', ch.regional_map, { height: 340, margin: { l: 0, r: 0, t: 0, b: 0 } });
+      renderChart('chart-ts', ch.time_series, { height: 240, margin: { l: 52, r: 12, t: 28, b: 40 } });
+      renderChart('chart-mon', ch.monthly, { height: 220, margin: { l: 52, r: 12, t: 28, b: 36 } });
+      renderChart('chart-cmp', ch.comparison, { height: 220, margin: { l: 52, r: 12, t: 28, b: 36 } });
+      renderChart('chart-rcp', ch.rcp, { height: 250, margin: { l: 52, r: 12, t: 28, b: 40 } });
+      if (ch.analogues) {
+        renderChart('chart-analogue', ch.analogues, { height: 220, margin: { l: 0, r: 0, t: 0, b: 0 } });
+      }
+
+      /* ── RCP mini canvases ─────────────────────────────────────── */
+      const bv = parseFloat(stats.baseline_mean) || 10;
+      const SL = {
+        temperature: { r26: .45, r45: 1.2, r85: 2.8 },
+        precipitation: { r26: .04, r45: .10, r85: .22 },
+        wind_speed: { r26: .08, r45: .20, r85: .48 },
+        solar_radiation: { r26: -.5, r45: -1.2, r85: -2.5 },
+        soil_moisture: { r26: -.002, r45: -.005, r85: -.012 }
+      };
+      const sl = SL[D.variable] || SL.temperature;
+      setTimeout(() => {
+        drawRCP('rcp26', bv, sl.r26, '#4ad4e8');
+        drawRCP('rcp45', bv, sl.r45, '#f0b429');
+        drawRCP('rcp85', bv, sl.r85, '#a78bfa');
+      }, 300);
+
+      /* ══════════════════════════════════════════════════════════
+         YEAR SLIDER — calls /api/heatmap for real ERA5 data
+      ══════════════════════════════════════════════════════════ */
+      let sliderDebounce = null, animHandle = null, isAnimating = false;
+      const slider = document.getElementById('yr-slider');
+      const yrLabel = document.getElementById('yr-label');
+
+      function updateSliderPct() {
+        const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+        slider.style.background = `linear-gradient(to right,var(--cyan) ${pct}%,rgba(74,212,232,0.18) ${pct}%)`;
+      }
+
+      async function fetchHeatmap(year) {
+        const loading = document.getElementById('map-loading');
+        loading.classList.add('show');
+        try {
+          const r = await fetch('/api/heatmap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              lat: loc.lat, lon: loc.lon,
+              year: parseInt(year),
+              month: D.month,
+              variable: D.variable,
+            }),
+          });
+          const data = await r.json();
+          if (data.success && data.chart) {
+            renderChart('chart-map', data.chart, { height: 340, margin: { l: 0, r: 0, t: 0, b: 0 } });
+          }
+        } catch (e) {
+          console.error('Heatmap fetch failed:', e);
+        } finally {
+          loading.classList.remove('show');
+        }
+      }
+
+      slider.addEventListener('input', function () {
+        yrLabel.textContent = this.value;
+        updateSliderPct();
+        clearTimeout(sliderDebounce);
+        // Debounce 600ms — don't hammer the server on every pixel
+        sliderDebounce = setTimeout(() => fetchHeatmap(this.value), 600);
+      });
+      updateSliderPct();
+
+      // Animate button
+      document.getElementById('btn-animate').addEventListener('click', function () {
+        if (isAnimating) {
+          isAnimating = false;
+          clearInterval(animHandle);
+          this.textContent = '▶ Animate';
+          return;
+        }
+        isAnimating = true;
+        this.textContent = '⏹ Stop';
+        let yr = parseInt(slider.value);
+        animHandle = setInterval(async () => {
+          yr++;
+          if (yr > 2023) { yr = 1950; }
+          slider.value = yr;
+          yrLabel.textContent = yr;
+          updateSliderPct();
+          await fetchHeatmap(yr);
+        }, 1800);  // one ERA5 fetch per 1.8s
+      });
+
+      document.getElementById('btn-reset-year').addEventListener('click', () => {
+        isAnimating = false;
+        clearInterval(animHandle);
+        document.getElementById('btn-animate').textContent = '▶ Animate';
+        slider.value = D.year;
+        yrLabel.textContent = D.year;
+        updateSliderPct();
+        renderChart('chart-map', ch.regional_map, { height: 340, margin: { l: 0, r: 0, t: 0, b: 0 } });
+      });
+
+      /* ══════════════════════════════════════════════════════════
+         AI ANALYSIS — streams from OpenAI via Flask SSE
+      ══════════════════════════════════════════════════════════ */
+      window.sendAI = async function () {
+        const btn = document.getElementById('ai-send-btn');
+        const input = document.getElementById('ai-input');
+        const box = document.getElementById('ai-response');
+        const question = input.value.trim();
+
+        btn.disabled = true;
+        btn.textContent = '…';
+        box.classList.remove('empty');
+        box.classList.add('streaming');
+        box.innerHTML = '<span class="ai-cursor"></span>';
+
+        let text = '';
+
+        try {
+          const r = await fetch('/api/ai-analysis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: loc,
+              variable: D.variable,
+              variable_label: D.variable_label,
+              unit: D.unit,
+              current_value: D.current_value,
+              current_fmt: D.current_fmt,
+              classification: D.classification,
+              stats: stats,
+              rcp_proj_2045: rcp,
+              year: D.year,
+              month_name: D.month_name,
+              question: question,
+            }),
+          });
+
+          if (!r.ok) {
+            const err = await r.json();
+            box.classList.remove('streaming');
+            box.classList.add('empty');
+            box.textContent = '⚠ ' + err.error;
+            btn.disabled = false; btn.textContent = 'Analyse ↗';
+            return;
+          }
+
+          const reader = r.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const payload = line.slice(6).trim();
+              if (payload === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(payload);
+                if (parsed.token) {
+                  text += parsed.token;
+                  box.innerHTML = text + '<span class="ai-cursor"></span>';
+                  box.scrollTop = box.scrollHeight;
+                }
+                if (parsed.error) {
+                  text += ' [Error: ' + parsed.error + ']';
+                }
+              } catch { }
+            }
+          }
+
+          box.classList.remove('streaming');
+          box.innerHTML = text;
+          input.value = '';
+
+        } catch (e) {
+          box.classList.remove('streaming');
+          box.classList.add('empty');
+          box.textContent = '⚠ Connection error: ' + e.message;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Analyse ↗';
+        }
+      };
+
+      // Allow Enter key to submit
+      document.getElementById('ai-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') window.sendAI();
+      });
+
+      /* ── Story buttons ─────────────────────────────────────────── */
+      document.querySelectorAll('.story-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.story-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const el = document.getElementById('story-content');
+          el.style.opacity = '0';
+          setTimeout(() => { el.innerHTML = stories[parseInt(btn.dataset.i)].text; el.style.opacity = '1' }, 200);
+        });
+      });
+
+      /* ── CSV export ────────────────────────────────────────────── */
+      function doCSV() {
+        const rows = [
+          ['Parameter', 'Value', 'Unit', 'Source'],
+          ['Location', loc.name, '', ''],
+          ['Latitude', loc.lat, '°', ''],
+          ['Longitude', loc.lon, '°', ''],
+          ['Variable', varLabel, '', ''],
+          ['Year', D.year, '', ''],
+          ['Month', D.month_name, '', ''],
+          ['Current Value', D.current_value, unit, 'ERA5'],
+          ['Classification', D.classification, '', ''],
+          ['Baseline Mean (1980-2010)', stats.baseline_mean, unit, 'ERA5'],
+          ['Anomaly vs Baseline', stats.anomaly, unit, 'ERA5'],
+          ['Trend per Decade', stats.trend_per_decade, unit + '/decade', 'ERA5'],
+          ['Seasonal Min', stats.seasonal_min, unit, 'ERA5'],
+          ['Seasonal Max', stats.seasonal_max, unit, 'ERA5'],
+          ['RCP 2.6 Projection (2045)', rcp['2.6'], unit, 'IPCC'],
+          ['RCP 4.5 Projection (2045)', rcp['4.5'], unit, 'IPCC'],
+          ['RCP 8.5 Projection (2045)', rcp['8.5'], unit, 'IPCC'],
+        ];
+        const csv = rows.map(r => r.map(x => `"${x}"`).join(',')).join('\n');
+        const a = document.createElement('a');
+        a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+        a.download = `pyclimaexplorer_ERA5_${D.variable}_${D.year}.csv`;
+        a.click();
+      }
+      document.getElementById('btn-csv').addEventListener('click', doCSV);
+      document.getElementById('btn-share').addEventListener('click', () => {
+        navigator.clipboard && navigator.clipboard.writeText(location.href)
+          .then(() => alert('Link copied!'));
+      });
+
+      /* ── Scroll animations ─────────────────────────────────────── */
+      setTimeout(() => document.getElementById('page-wrap').classList.add('visible'), 60);
+      const obs = new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target) } });
+      }, { threshold: 0.07 });
+      document.querySelectorAll('.stat-card,.fade-up').forEach(el => obs.observe(el));
+    }
+  </script>
+</body>
+
+</html>
